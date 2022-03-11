@@ -1,8 +1,12 @@
+
+// <div id="albot-area"></div>
+// <script type="module" crossorigin="anonymous" src="http://localhost:3000/aibot.js"></script>
 // CONFIG FIREBASE
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.8/firebase-app.js";
 import { getAuth } from "https://cdnjs.cloudflare.com/ajax/libs/firebase/9.6.8/firebase-auth.js";
 import { signInWithPopup } from "https://cdnjs.cloudflare.com/ajax/libs/firebase/9.6.8/firebase-auth.js";
 import { TwitterAuthProvider } from "https://cdnjs.cloudflare.com/ajax/libs/firebase/9.6.8/firebase-auth.js";
+import { signOut } from "https://cdnjs.cloudflare.com/ajax/libs/firebase/9.6.8/firebase-auth.js";
 
 // START FIREBASE -------------------
 const firebaseConfig = {
@@ -18,32 +22,36 @@ initializeApp(firebaseConfig);
 // END FIREBASE
 // ALL CONFIG
 const config_web = {
+    embed_id: 'albot-area',
     domain: 'https://ai-boot.rionlab.com',
+    api_host: 'https://ai-boot.rionlab.com/api',
     tokenTw: 'access_key_tw',
     tokenTwInfo: 'access_key_tw_info',
-    icon_logo: 'https://ai-boot.rionlab.com/assets/images/icon-message-active.png',
+    icon_logo: 'https://ai-boot.rionlab.com/assets/images/logo.png',
     icon_tweet_active: 'https://ai-boot.rionlab.com/assets/images/icon_twitter-active.png',
     icon_tweet: 'https://ai-boot.rionlab.com/assets/images/icon_twitter.png',
-    icon_message_active: 'https://ai-boot.rionlab.com/assets/images/icon-message-active.png',
+    icon_message_active: 'https://ai-boot.rionlab.com/assets/images/logo.png',
     icon_message: 'https://ai-boot.rionlab.com/assets/images/icon_message.png',
     id_after_login: 'header-logined',
-    avatar_bot: 'https://ai-boot.rionlab.com/assets/images/img_boot.png'
+    avatar_bot: 'https://ai-boot.rionlab.com/assets/images/img_boot.png',
+    icon_social: [
+        'https://ai-boot.rionlab.com/assets/images/embed/icon-comment.png',
+        'https://ai-boot.rionlab.com/assets/images/embed/icon-hear.png',
+        'https://ai-boot.rionlab.com/assets/images/embed/icon-retweet.png'
+    ],
+    id_html_area_login: 'aibot-login-area-ai',
+    id_html_area_dashboard: 'aibot-dashoard-area',
+    id_html_area_tab_ai: 'aibot-dashoard-tab-ai',
+    id_html_area_tab_comment: 'aibot-dashoard-tab-comment'
 }
 // END ALL CONFIG
-// COMMON FUNTION
-function loadFont(name, url) {
-    var newStyle = document.createElement('style');
-    newStyle.appendChild(document.createTextNode('@font-face{font-family: ' + name + '; src: url(' + url + ');}'));
-    document.body.appendChild(newStyle)
-}
-// END FUNTION
-// CONFIG WEB
-const embedArea = document.getElementById('albot-area');
-embedArea.style.boxSizing = 'border-box';
+// COMMON FUNTION AND VARIABLE
+const AUTH = getAuth();
+const EMBED_AREA = document.getElementById(config_web.embed_id);
 const styleTag = document.createElement('style');
 styleTag.textContent = `*{box-sizing: border-box}`;
 document.head.appendChild(styleTag);
-//END CONFIG WEB
+
 function returnHeaderAndLogo(params) {
     // HEADER 
     var headTitle = document.createElement('h2');
@@ -67,12 +75,10 @@ function returnHeaderAndLogo(params) {
     headTitle.appendChild(headSpan);
     return headTitle;
 }
-
 function changePropertyHeader(params) {
     document.getElementById('img' + params.id).src = params.src;
     document.getElementById('span' + params.id).innerText = params.txt;
 }
-
 function returnMessageChatNormal(params) {
     var newDivMessage = document.createElement('div');
     newDivMessage.classList.add('message');
@@ -91,14 +97,21 @@ function returnMessageChatNormal(params) {
     setStyleAtrribute(avatarDiv, {
         width: '50px'
     });
+    if (params.is_question) {
+        setStyleAtrribute(avatarDiv, {
+            text_align: 'right'
+        });
+    }
     var imgAvatarDiv = document.createElement('img');
     imgAvatarDiv.src = params.avatar;
     imgAvatarDiv.alt = 'avatar';
     setStyleAtrribute(imgAvatarDiv, {
         width: '30px',
         height: '30px',
-        border_radius: '50%'
+        border_radius: '50%',
+        display: 'inline-block'
     });
+
     avatarDiv.appendChild(imgAvatarDiv);
 
     var messageDiv = document.createElement('div');
@@ -164,13 +177,19 @@ function returnMessageChatSpecial(params) {
     setStyleAtrribute(avatarDiv, {
         width: '50px'
     });
+    if (params.is_question) {
+        setStyleAtrribute(avatarDiv, {
+            text_align: 'right'
+        });
+    }
     var imgAvatarDiv = document.createElement('img');
     imgAvatarDiv.src = params.avatar;
     imgAvatarDiv.alt = 'avatar';
     setStyleAtrribute(imgAvatarDiv, {
         width: '30px',
         height: '30px',
-        border_radius: '50%'
+        border_radius: '50%',
+        display: 'inline-block'
     });
     avatarDiv.appendChild(imgAvatarDiv);
 
@@ -224,7 +243,7 @@ function returnMessageChatSpecial(params) {
             margin_right: '5px'
         });
         var img = document.createElement('img');
-        img.src = config_web.icon_message_active;
+        img.src = config_web.icon_social[index];
         setStyleAtrribute(img, {
             width: '10px',
             height: '10px',
@@ -260,97 +279,40 @@ function setStyleAtrribute(tag, propterty) {
         tag.style.setProperty(key2, propterty[key]);
     }
 }
-
-// UI LOGIN AND HANDLE
-var loginTw = () => {
-    const provider = new TwitterAuthProvider();
-    const auth = getAuth();
-    signInWithPopup(auth, provider)
-        .then((ressult) => {
-            // This gives you a the Twitter OAuth 1.0 Access Token and Secret.
-            // You can use these server side with your app's credentials to access the Twitter API.
-            console.log(ressult);
-            const credential = TwitterAuthProvider.credentialFromResult(ressult);
-            const token = credential.accessToken;
-            const secret = credential.secret;
-            // The signed-in user info.
-            const user = ressult.user;
-            console.log('token', token);
-            console.log('token', secret);
-            console.log('user', user);
-
-            localStorage.setItem(config_web.tokenTw, `${token}:${secret}`);
-            localStorage.setItem(config_web.tokenTwInfo, JSON.stringify(user));
-            // ...
-        }).catch((error) => {
-            // Handle Errors here.
-            const errorCode = error.code;
-            const errorMessage = error.message;
-            // The email of the user's account used.
-            const email = error.email;
-            // The AuthCredential type that was used.
-            const credential = TwitterAuthProvider.credentialFromError(error);
-            // ...
-        });
+function loadFont(name, url) {
+    var newStyle = document.createElement('style');
+    newStyle.appendChild(document.createTextNode('@font-face{font-family: ' + name + '; src: url(' + url + ');}'));
+    document.body.appendChild(newStyle)
 }
-var loginUi = () => {
-    // area 
-    var loginArea = document.createElement('div');
-    loginArea.id = 'login-area';
-    loginArea.style.padding = '20px 20px'
-    loginArea.style.boxShadow = '0 10px 25px #52575D';
-    loginArea.style.borderRadius = '15px';
-    loginArea.style.width = '100%';
-    // HEADER 
-    loginArea.appendChild(returnHeaderAndLogo({ txt: 'AI チャットボット', id: 'header-none-login' }));
-    // TEXT DESCRIPTION
-
-    var description = document.createElement('p');
-    description.innerHTML = `ツイッターにログインしていませんので、ご利用前にログインしてください`;
-    description.style.textAlign = 'center';
-    // Parrent append
-    loginArea.appendChild(description);
-    // BUTTON LOGIN
-    var buttonLogin = document.createElement('button');
-    buttonLogin.id = 'login-area-btn';
-
-    setStyleAtrribute(buttonLogin, {
-        background_color: '#4392A8',
-        border_radius: '5px',
-        border: '0',
-        display: 'flex',
-        justify_content: 'center',
-        align_items: 'center',
-        height: '30px',
-        margin: '20px auto',
-        cursor: 'pointer'
-    });
-
-
-    var imgTwitter = document.createElement('img');
-    imgTwitter.src = config_web.icon_tweet;
-    imgTwitter.style.width = '20px';
-    imgTwitter.style.marginRight = '10px';
-    buttonLogin.appendChild(imgTwitter);
-
-    var headSpan = document.createElement('span');
-    headSpan.innerText = 'AI Twitterログイン';
-    setStyleAtrribute(headSpan, {
-        color: 'white',
-        font_weight: 'bold',
-        font_size: '12px'
-    });
-    buttonLogin.appendChild(headSpan);
-    buttonLogin.addEventListener('click', loginTw);
-    // Parrent append
-    loginArea.appendChild(buttonLogin);
-    return loginArea;
+function callApi(method, path, body, callback) {
+    const xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function () {
+        if (this.readyState == 4 && callback) {
+            callback(this);
+        }
+    }
+    xhttp.open(method, config_web.api_host + path);
+    xhttp.setRequestHeader("Content-type", "application/json");
+    xhttp.send(body);
 }
-//END UI LOGIN AND HANDLE 
-// UI HOME
+function convertDate(params) {
+    var year = new Date(params).getFullYear();
+    var month_convert = new Date(params).getMonth() + 1;
+    var month = '0' + month_convert.toString();
+    var day_convert = new Date(params).getDate();
+    var day = '0' + day_convert.toString();
+
+    var minutes_convert = new Date(params).getMinutes();
+    var minutes = '0' + minutes_convert.toString();
+    var hour_convert = new Date(params).getHours();
+    var hour = '0' + hour_convert.toString();
+    return year + '/' + month.slice(-2) + '/' + day.slice(-2) + ' ' + hour.slice(-2) + ':' + minutes.slice(-2);
+}
+// END COMMON FUNTION AND VARIABLE
+// UI  HOME
 var dashBoardUi = () => {
     var dashboardArea = document.createElement('div');
-    dashboardArea.id = 'dashoard-area';
+    dashboardArea.id = config_web.id_html_area_dashboard;
 
     setStyleAtrribute(dashboardArea, {
         padding: '0 0 20px 0',
@@ -358,21 +320,53 @@ var dashBoardUi = () => {
         border_radius: '15px',
         width: '100%'
     });
-    // HEADER 
+    /*
+       1. Container header ->divHead
+            1.1 headLeft
+                1.1.1 titleHeadLeft
+                1.1.2 buttonLogOutHeadLeft
+            1.2 divTab
+                1.2.1 tabAI
+                1.2.2 tabComment
+   */
     var divHead = document.createElement('div');
     divHead.style.display = 'flex';
 
-    // HEADER-LEFT
-    var headLeft = returnHeaderAndLogo({ txt: 'AI チャットボット', id: config_web.id_after_login });
+    var headLeft = document.createElement('div');
     setStyleAtrribute(headLeft, {
         width: '50%',
-        justify_content: 'center',
+        display: 'flex',
+        justify_content: 'space-between',
+        align_items: 'center',
         margin: 0,
         padding: '0 10px'
     });
+
+    var titleHeadLeft = returnHeaderAndLogo({ txt: 'AI チャットボット', id: config_web.id_after_login });
+    setStyleAtrribute(titleHeadLeft, {
+        padding: '0 10px'
+    });
+
+    var buttonLogOutHeadLeft = document.createElement('button');
+    buttonLogOutHeadLeft.innerText = 'ログアウト';
+    setStyleAtrribute(buttonLogOutHeadLeft, {
+        padding: '0 10px',
+        margin_left: '10px',
+        cursor: 'pointer',
+        background_color: '#4392A8',
+        color: 'white',
+        font_size: '10px',
+        border_radius: '5px',
+        border: 0
+    });
+
+    buttonLogOutHeadLeft.addEventListener('click', logoutTw);
+
+    headLeft.appendChild(titleHeadLeft);
+    headLeft.appendChild(buttonLogOutHeadLeft);
+
     divHead.appendChild(headLeft);
-    headLeft.style.justifyContent = 'flex-start';
-    // HEADER-RIGHT
+    // 1.2 divTab
     var divTab = document.createElement('div');
     divTab.id = 'tab';
 
@@ -381,7 +375,6 @@ var dashBoardUi = () => {
         display: 'flex'
     });
 
-    // Tab ai 
     var tabAI = document.createElement('button');
     tabAI.classList.add('tab-active');
     setStyleAtrribute(tabAI, {
@@ -473,6 +466,15 @@ var dashBoardUi = () => {
                 txt: 'Twitter チャットボット',
                 src: config_web.icon_tweet_active
             });
+            // active area
+            setStyleAtrribute(boxCommentTwArea, {
+                display: 'block'
+            });
+            setStyleAtrribute(boxAiArea, {
+                display: 'none'
+            });
+
+            aiAraeLeftTextarea.value = '';
         }
     });
 
@@ -504,11 +506,21 @@ var dashBoardUi = () => {
                 txt: 'AI チャットボット',
                 src: config_web.icon_message_active
             });
+            // Active area
+            setStyleAtrribute(boxCommentTwArea, {
+                display: 'none'
+            });
+            setStyleAtrribute(boxAiArea, {
+                display: 'block'
+            });
+            commentTwAreaLeftTextarea.value = '';
         }
     });
     // AI BOT AREA ******************************************
+    var boxAiArea = document.createElement('div');
+    boxAiArea.id = config_web.id_html_area_tab_ai;
+
     var aiArea = document.createElement('div');
-    aiArea.id = 'ai-area';
     setStyleAtrribute(aiArea, {
         width: '100%',
         display: 'flex',
@@ -518,7 +530,8 @@ var dashBoardUi = () => {
     var aiAreaRight = document.createElement('div');
     aiAreaRight.id = 'ai-area-right';
     setStyleAtrribute(aiAreaRight, {
-        width: '50%'
+        width: '50%',
+        overflow: 'hidden'
     });
 
     var aiAreaRightBoxChat = document.createElement('div');;
@@ -534,22 +547,9 @@ var dashBoardUi = () => {
             is_question: false,
             date: '2022.02.10 11:04',
             avatar: config_web.avatar_bot,
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
-        },
-        {
-            is_question: true,
-            date: '2022.02.10 11:04',
-            avatar: 'https://media.istockphoto.com/vectors/default-profile-picture-avatar-photo-placeholder-vector-illustration-vector-id1223671392?k=20&m=1223671392&s=170667a&w=0&h=kEAA35Eaz8k8A3qAGkuY8OZxpfvn9653gDjQwDHZGPE=',
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
-        },
-        {
-            is_question: false,
-            date: '2022.02.10 11:04',
-            avatar: config_web.avatar_bot,
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+            message: 'DAIKO に質問をしてみてください。\nAIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
         }
-    ]
-
+    ];
 
     for (let index = 0; index < arrayMessage.length; index++) {
         const element = arrayMessage[index];
@@ -571,7 +571,7 @@ var dashBoardUi = () => {
     aiAraeLeftHeader.id = 'ai-area-left-header';
     aiAraeLeftHeader.innerHTML = `DAIKO に<br>質問をしてみよう！`;
     setStyleAtrribute(aiAraeLeftHeader, {
-        font_size: '14px'
+        font_size: '30px'
     });
 
     var aiAraeLeftTextarea = document.createElement('textarea');
@@ -604,18 +604,41 @@ var dashBoardUi = () => {
     aiAraeLeftButton.addEventListener('click', () => {
         const txt = aiAraeLeftTextarea.value;
         if (txt.trim().length > 0) {
+            const avatar_url = localStorage.getItem(config_web.tokenTwInfo) ?
+                JSON.parse(localStorage.getItem(config_web.tokenTwInfo)).photoURL : config_web.avatar_bot;
             const obj = {
                 is_question: true,
-                date: '2022.02.10 11:04',
-                avatar: 'https://media.istockphoto.com/vectors/default-profile-picture-avatar-photo-placeholder-vector-illustration-vector-id1223671392?k=20&m=1223671392&s=170667a&w=0&h=kEAA35Eaz8k8A3qAGkuY8OZxpfvn9653gDjQwDHZGPE=',
+                date: convertDate(new Date().getTime()),
+                avatar: avatar_url,
                 message: txt
             };
             // APPENT TO CHAT
-            aiAreaLeftBoxChat.appendChild(returnMessageChatNormal(obj));
-            aiAreaLeftBoxChat.scrollTop = aiAreaLeftBoxChat.scrollHeight - aiAreaLeftBoxChat.clientHeight;
+            aiAreaRightBoxChat.appendChild(returnMessageChatNormal(obj));
+            aiAreaRightBoxChat.scrollTop = aiAreaRightBoxChat.scrollHeight - aiAreaRightBoxChat.clientHeight;
+            aiAraeLeftTextarea.value = '';
+
+            const body = {
+                session_id: -1,
+                message: txt,
+                service_id: 1
+            }
+
+            callApi('POST', '/ai-bot/comment-suggest', JSON.stringify(body), (res) => {
+                const result = JSON.parse(res.responseText);
+                if (result.error_code == 0) {
+                    const obj_answer = {
+                        is_question: false,
+                        date: convertDate(new Date().getTime()),
+                        avatar: config_web.avatar_bot,
+                        message: result.result
+                    };
+                    aiAreaRightBoxChat.appendChild(returnMessageChatNormal(obj_answer));
+                    aiAreaRightBoxChat.scrollTop = aiAreaRightBoxChat.scrollHeight - aiAreaRightBoxChat.clientHeight;
+                }
+            });
+
         }
     });
-
 
     aiAreaLeft.appendChild(aiAraeLeftHeader);
     aiAreaLeft.appendChild(aiAraeLeftTextarea);
@@ -625,10 +648,14 @@ var dashBoardUi = () => {
     aiArea.appendChild(aiAreaLeft);
     aiArea.appendChild(aiAreaRight);
 
+    boxAiArea.appendChild(aiArea);
     // END AI BOT AREA ******************************************
     // START TAB TW ******************************************
+    var boxCommentTwArea = document.createElement('div');
+    boxCommentTwArea.id = config_web.id_html_area_tab_comment;
+    setStyleAtrribute(boxCommentTwArea, { display: 'none' });
     var commentTwArea = document.createElement('div');
-    commentTwArea.id = 'comment-tw-area';
+
     setStyleAtrribute(commentTwArea, {
         width: '100%',
         display: 'flex',
@@ -642,7 +669,6 @@ var dashBoardUi = () => {
         position: 'relative'
     });
 
-
     // POPUP REPLY
 
     var replyCommentTwAreaRight = document.createElement('div');
@@ -653,7 +679,8 @@ var dashBoardUi = () => {
         bottom: 0,
         left: 0,
         background_color: 'white',
-        display: 'none'
+        display: 'none',
+        overflow: 'hidden'
     });
 
     var replyCommentTwAreaRightHead = document.createElement('h3');
@@ -662,20 +689,24 @@ var dashBoardUi = () => {
     });
 
     var headBack = document.createElement('span');
-    headBack.innerText = '<';
     setStyleAtrribute(headBack, {
         position: 'absolute',
         left: '10px',
         font_size: '20px',
-        font_weight: 'bold',
         cursor: 'pointer',
         color: 'white',
         width: '30px',
-        height: '20px',
-        text_align: 'center',
-        background_color: '#4392A8',
-        border_radius: '5px'
+        height: '20px'
     });
+    var iArrow = document.createElement('i');
+    setStyleAtrribute(iArrow, {
+        border: 'solid #4392A8',
+        border_width: '0 3px 3px 0',
+        display: 'inline-block',
+        padding: '3px',
+        transform: 'rotate(135deg)'
+    });
+    headBack.appendChild(iArrow);
 
     headBack.addEventListener('click', () => {
         setStyleAtrribute(replyCommentTwAreaRight, {
@@ -714,7 +745,6 @@ var dashBoardUi = () => {
             message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
         }
     ]
-
 
     for (let index = 0; index < arrayMessageTwDetail.length; index++) {
         const element = arrayMessageTwDetail[index];
@@ -765,7 +795,7 @@ var dashBoardUi = () => {
             avatar: config_web.avatar_bot,
             message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
         }
-    ]
+    ];
 
 
     for (let index = 0; index < arrayMessageTw.length; index++) {
@@ -795,7 +825,7 @@ var dashBoardUi = () => {
     commentTwAreaLeftHeader.id = 'comment-tw-area-left-header';
     commentTwAreaLeftHeader.innerHTML = `DAIKO に<br>コメントをしてみよう！`;
     setStyleAtrribute(commentTwAreaLeftHeader, {
-        font_size: '14px'
+        font_size: '30px'
     });
 
     var commentTwAreaLeftTextarea = document.createElement('textarea');
@@ -826,18 +856,25 @@ var dashBoardUi = () => {
         cursor: 'pointer'
     });
     commentTwAreaLeftButton.addEventListener('click', () => {
-        const txt = commentTwAreaLeftTextarea.value;
-        if (txt.trim().length > 0) {
-            const obj = {
-                is_question: true,
-                date: '2022.02.10 11:04',
-                avatar: 'https://media.istockphoto.com/vectors/default-profile-picture-avatar-photo-placeholder-vector-illustration-vector-id1223671392?k=20&m=1223671392&s=170667a&w=0&h=kEAA35Eaz8k8A3qAGkuY8OZxpfvn9653gDjQwDHZGPE=',
-                message: txt
-            };
-            // APPENT TO CHAT
-            replyCommentTwAreaRightBoxChat.appendChild(returnMessageChatNormal(obj));
-            replyCommentTwAreaRightBoxChat.scrollTop = replyCommentTwAreaRightBoxChat.scrollHeight - replyCommentTwAreaRightBoxChat.clientHeight;
+        console.log(1)
+        if (replyCommentTwAreaRight.style.display == 'block') {
+            const txt = commentTwAreaLeftTextarea.value;
+            if (txt.trim().length > 0) {
+                const avatar_url = localStorage.getItem(config_web.tokenTwInfo) ?
+                    JSON.parse(localStor1age.getItem(config_web.tokenTwInfo)).photoURL : config_web.avatar_bot;
+                const obj = {
+                    is_question: true,
+                    date: convertDate(new Date().getTime()),
+                    avatar: avatar_url,
+                    message: txt
+                };
+                // APPENT TO CHAT
+                replyCommentTwAreaRightBoxChat.appendChild(returnMessageChatNormal(obj));
+                replyCommentTwAreaRightBoxChat.scrollTop = replyCommentTwAreaRightBoxChat.scrollHeight - replyCommentTwAreaRightBoxChat.clientHeight;
+                commentTwAreaLeftTextarea.value = '';
+            }
         }
+
     });
 
 
@@ -848,7 +885,7 @@ var dashBoardUi = () => {
     commentTwArea.appendChild(commentTwAreaLeft);
     commentTwArea.appendChild(commentTwAreaRight);
 
-
+    boxCommentTwArea.appendChild(commentTwArea);
     divTab.appendChild(tabAI);
     divTab.appendChild(tabComment);
 
@@ -856,24 +893,139 @@ var dashBoardUi = () => {
     divHead.appendChild(divTab);
 
     dashboardArea.appendChild(divHead);
-    dashboardArea.appendChild(aiArea);
-    dashboardArea.appendChild(commentTwArea);
+    dashboardArea.appendChild(boxAiArea);
+    dashboardArea.appendChild(boxCommentTwArea);
 
     return dashboardArea;
 
 }
-// UI END HOME
-if (embedArea) {
-    const uiLogin = loginUi();
-    console.log(uiLogin);
-    embedArea.appendChild(loginUi());
-    embedArea.appendChild(dashBoardUi());
+// END UI HOME
+// UI LOGIN AND HANDLE
+var loginUi = () => {
+    // area 
+    var loginArea = document.createElement('div');
+    loginArea.id = config_web.id_html_area_login;
+    loginArea.style.padding = '20px 20px'
+    loginArea.style.boxShadow = '0 10px 25px #52575D';
+    loginArea.style.borderRadius = '15px';
+    loginArea.style.width = '100%';
+    // HEADER 
+    loginArea.appendChild(returnHeaderAndLogo({ txt: 'AI チャットボット', id: 'header-none-login' }));
+    // TEXT DESCRIPTION
 
+    var description = document.createElement('p');
+    description.innerHTML = `ツイッターにログインしていませんので、ご利用前にログインしてください`;
+    description.style.textAlign = 'center';
+    // Parrent append
+    loginArea.appendChild(description);
+    // BUTTON LOGIN
+    var buttonLogin = document.createElement('button');
+    buttonLogin.id = 'login-area-btn';
+
+    setStyleAtrribute(buttonLogin, {
+        background_color: '#4392A8',
+        border_radius: '5px',
+        border: '0',
+        display: 'flex',
+        justify_content: 'center',
+        align_items: 'center',
+        height: '30px',
+        margin: '20px auto',
+        cursor: 'pointer'
+    });
+
+
+    var imgTwitter = document.createElement('img');
+    imgTwitter.src = config_web.icon_tweet;
+    imgTwitter.style.width = '20px';
+    imgTwitter.style.marginRight = '10px';
+    buttonLogin.appendChild(imgTwitter);
+
+    var headSpan = document.createElement('span');
+    headSpan.innerText = 'AI Twitterログイン';
+    setStyleAtrribute(headSpan, {
+        color: 'white',
+        font_weight: 'bold',
+        font_size: '12px'
+    });
+    buttonLogin.appendChild(headSpan);
+    buttonLogin.addEventListener('click', loginTw);
+    // Parrent append
+    loginArea.appendChild(buttonLogin);
+
+    return loginArea;
+}
+var loginTw = () => {
+    const provider = new TwitterAuthProvider();
+    signInWithPopup(AUTH, provider)
+        .then((ressult) => {
+            // This gives you a the Twitter OAuth 1.0 Access Token and Secret.
+            // You can use these server side with your app's credentials to access the Twitter API.
+            console.log(ressult);
+            const credential = TwitterAuthProvider.credentialFromResult(ressult);
+            const token = credential.accessToken;
+            const secret = credential.secret;
+            // The signed-in user info.
+            const user = ressult.user;
+            console.log('token', token);
+            console.log('token', secret);
+            console.log('user', user);
+
+            localStorage.setItem(config_web.tokenTw, `${token}:${secret}`);
+            localStorage.setItem(config_web.tokenTwInfo, JSON.stringify(user));
+
+            if (user && token && secret) {
+                onloadEmbed();
+            }
+
+            // ...
+        }).catch((error) => {
+            // Handle Errors here.
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            // The email of the user's account used.
+            const email = error.email;
+            // The AuthCredential type that was used.
+            const credential = TwitterAuthProvider.credentialFromError(error);
+            // ...
+        });
+}
+var logoutTw = () => {
+    signOut(AUTH).then(() => {
+        localStorage.removeItem(config_web.tokenTw);
+        localStorage.removeItem(config_web.tokenTwInfo);
+        onloadEmbed();
+        console.log(1);
+    }).catch((error) => {
+        localStorage.removeItem(config_web.tokenTw);
+        localStorage.removeItem(config_web.tokenTwInfo);
+        onloadEmbed();
+        console.log(2);
+    });
+}
+//END UI LOGIN AND HANDLE 
+function onloadEmbed() {
+    const TOKEN = localStorage.getItem(config_web.tokenTw);
+    const USER_INFO = localStorage.getItem(config_web.tokenTw);
+
+    if (EMBED_AREA) {
+
+        if (TOKEN && USER_INFO) {
+            if (document.getElementById(config_web.id_html_area_login)) {
+                EMBED_AREA.removeChild(document.getElementById(config_web.id_html_area_login));
+            }
+            console.log(1);
+            EMBED_AREA.appendChild(dashBoardUi());
+        } else {
+            if (document.getElementById(config_web.id_html_area_dashboard)) {
+                EMBED_AREA.removeChild(document.getElementById(config_web.id_html_area_dashboard));
+            }
+            EMBED_AREA.appendChild(loginUi());
+        }
+    }
 }
 
-
-
-
+onloadEmbed();
 
 
 
