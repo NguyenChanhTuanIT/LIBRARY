@@ -41,17 +41,37 @@ const config_web = {
     ],
     id_html_area_login: 'aibot-login-area-ai',
     id_html_area_dashboard: 'aibot-dashoard-area',
-    id_html_area_tab_ai: 'aibot-dashoard-tab-ai',
-    id_html_area_tab_comment: 'aibot-dashoard-tab-comment'
+    id_html_area_ai: 'aibot-dashoard-tab-ai',
+    id_html_area_comment: 'aibot-dashoard-tab-comment',
+    id_html_area_comment_left: 'aibot-dashoard-tab-comment-left',
+    id_html_area_comment_right: 'aibot-dashoard-tab-comment-right',
+    id_html_area_comment_detail: 'aibot-dashoard-comment-reply-post-detail',
+    id_html_area_comment_detail_box_chat: 'aibot-dashoard-comment-reply-post-detail-box-chat',
+    id_html_area_comment_textarea: 'aibot-dashoard-comment-textarea',
+    id_html_loading: 'aibot-loading',
+    method_get: 'GET',
+    method_post: 'POST',
 }
 // END ALL CONFIG
 // COMMON FUNTION AND VARIABLE
 const AUTH = getAuth();
 const EMBED_AREA = document.getElementById(config_web.embed_id);
 const styleTag = document.createElement('style');
-styleTag.textContent = `*{box-sizing: border-box}`;
+styleTag.textContent = `*{box-sizing: border-box};
+@-webkit-keyframes aibotspin {
+    0% { -webkit-transform: rotate(0deg); }
+    100% { -webkit-transform: rotate(360deg); }
+  }
+  
+  @keyframes aibotspin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
 document.head.appendChild(styleTag);
 
+var total_page = 1;
+var current_page = 1;
 function returnHeaderAndLogo(params) {
     // HEADER 
     var headTitle = document.createElement('h2');
@@ -273,44 +293,257 @@ function returnMessageChatSpecial(params) {
 
     return newDivMessage;
 }
-function setStyleAtrribute(tag, propterty) {
+var setStyleAtrribute = (tag, propterty) => {
     for (const key in propterty) {
         let key2 = key.toString().replace(/_/g, '-');
         tag.style.setProperty(key2, propterty[key]);
     }
 }
-function loadFont(name, url) {
-    var newStyle = document.createElement('style');
+var loadFont = (name, url) => {
+    let newStyle = document.createElement('style');
     newStyle.appendChild(document.createTextNode('@font-face{font-family: ' + name + '; src: url(' + url + ');}'));
     document.body.appendChild(newStyle)
 }
-function callApi(method, path, body, callback) {
+var callApi = (method, path, body, callback) => {
     const xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function () {
         if (this.readyState == 4 && callback) {
             callback(this);
         }
     }
-    xhttp.open(method, config_web.api_host + path);
+    xhttp.open(method, config_web.api_host + path, true);
     xhttp.setRequestHeader("Content-type", "application/json");
     xhttp.send(body);
 }
-function convertDate(params) {
-    var year = new Date(params).getFullYear();
-    var month_convert = new Date(params).getMonth() + 1;
-    var month = '0' + month_convert.toString();
-    var day_convert = new Date(params).getDate();
-    var day = '0' + day_convert.toString();
+var callApiAwait = (method, path, body) => {
+    return new Promise((resolve, reject) => {
+        // const xhttp = new XMLHttpRequest();
+        // xhttp.onreadystatechange = function () {
+        //     if (this.readyState == 4 && callback) {
+        //         resolve(this);
+        //     }
+        // }
+        // xhttp.open(method, config_web.api_host + path, true);
+        // xhttp.setRequestHeader("Content-type", "application/json");
+        // xhttp.send(body);
+        setTimeout(() => {
+            resolve(true)
+        }, 1000);
+    });
+}
 
-    var minutes_convert = new Date(params).getMinutes();
-    var minutes = '0' + minutes_convert.toString();
-    var hour_convert = new Date(params).getHours();
-    var hour = '0' + hour_convert.toString();
+var loadingUi = () => {
+    let loadingTask = document.createElement('div');
+    loadingTask.id = config_web.id_html_loading;
+    setStyleAtrribute(loadingTask, {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        left: 0,
+        bottom: 0,
+        z_index: 2,
+        background_color: '#00000050',
+        display: 'flex',
+        align_items: 'center',
+        justify_content: 'center'
+    });
+
+    let loader = document.createElement('div');
+    setStyleAtrribute(loader, {
+        border: "2px solid #f3f3f3",
+        border_radius: "50%",
+        border_top: "2px solid #4392a8",
+        width: "30px",
+        height: "30px",
+        animation: "aibotspin 2s linear infinite"
+    });
+
+
+
+    loadingTask.appendChild(loader);
+    return loadingTask;
+}
+
+var showLoading = () => {
+    document.getElementById(config_web.id_html_area_comment_right).appendChild(loadingUi());
+}
+var hideLoading = () => {
+    document.getElementById(config_web.id_html_area_comment_right).removeChild(document.getElementById(config_web.id_html_loading));
+}
+
+var convertDate = (params) => {
+    let year = new Date(params).getFullYear();
+    let month_convert = new Date(params).getMonth() + 1;
+    let month = '0' + month_convert.toString();
+    let day_convert = new Date(params).getDate();
+    let day = '0' + day_convert.toString();
+
+    let minutes_convert = new Date(params).getMinutes();
+    let minutes = '0' + minutes_convert.toString();
+    let hour_convert = new Date(params).getHours();
+    let hour = '0' + hour_convert.toString();
     return year + '/' + month.slice(-2) + '/' + day.slice(-2) + ' ' + hour.slice(-2) + ':' + minutes.slice(-2);
 }
 // END COMMON FUNTION AND VARIABLE
 // UI  HOME
-var dashBoardUi = () => {
+var renderElementComment = (tag, parent_tag, data) => {
+    const arrayMessageTw = [
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        },
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        },
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        },
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        },
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        }
+    ];
+    for (let index = 0; index < arrayMessageTw.length; index++) {
+        const element = arrayMessageTw[index];
+        const newElementMessageNormal = returnMessageChatSpecial(element);
+
+        newElementMessageNormal.addEventListener('click', () => {
+            showLoading();
+            renderPopupReplyComment(parent_tag).then(
+                uiReply => {
+                    parent_tag.appendChild(uiReply);
+                    hideLoading();
+                }
+            );
+        });
+
+        tag.appendChild(newElementMessageNormal);
+    }
+}
+var renderPopupReplyComment = async (tag) => {
+
+    let conversation_id = '';
+    let arrayMessageTwDetail = [
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        },
+        {
+            is_question: false,
+            date: '2022.02.10 11:04',
+            avatar: config_web.avatar_bot,
+            message: 'DAIKO ddddddddddに質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+        }
+    ];
+
+    // UI 
+    let replyCommentTwAreaRight = document.createElement('div');
+    replyCommentTwAreaRight.id = config_web.id_html_area_comment_detail;
+    setStyleAtrribute(replyCommentTwAreaRight, {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        background_color: 'white',
+        display: 'block',
+        overflow: 'hidden'
+    });
+    let replyCommentTwAreaRightHead = document.createElement('h3');
+    setStyleAtrribute(replyCommentTwAreaRightHead, {
+        position: 'relative'
+    });
+
+    let headBack = document.createElement('span');
+    setStyleAtrribute(headBack, {
+        position: 'absolute',
+        left: '10px',
+        font_size: '20px',
+        cursor: 'pointer',
+        color: 'white',
+        width: '30px',
+        height: '20px'
+    });
+    let iArrow = document.createElement('i');
+    setStyleAtrribute(iArrow, {
+        border: 'solid #4392A8',
+        border_width: '0 3px 3px 0',
+        display: 'inline-block',
+        padding: '3px',
+        transform: 'rotate(135deg)'
+    });
+    headBack.appendChild(iArrow);
+
+    headBack.addEventListener('click', () => {
+        tag.removeChild(document.getElementById(config_web.id_html_area_comment_detail));
+    });
+
+    replyCommentTwAreaRightHead.append(headBack);
+
+    let headBackTitle = document.createElement('span');
+    headBackTitle.innerText = 'ツイート';
+    setStyleAtrribute(headBackTitle, {
+        width: '100%',
+        padding: '0',
+        text_align: 'center',
+        font_size: '12px',
+        margin: '0 0 10px 0',
+        display: 'block'
+    });
+
+    replyCommentTwAreaRightHead.append(headBackTitle);
+
+    replyCommentTwAreaRight.appendChild(replyCommentTwAreaRightHead);
+
+    let replyCommentTwAreaRightBoxChat = document.createElement('div');
+    replyCommentTwAreaRightBoxChat.id = config_web.id_html_area_comment_detail_box_chat;
+    setStyleAtrribute(replyCommentTwAreaRightBoxChat, {
+        width: '100%',
+        padding: '10px',
+        max_height: '400px',
+        overflow: 'auto'
+    });
+
+
+    await callApiAwait(config_web.method_get, '/tweet/page', null).then(res => {
+        console.log(res, 'after render detail');
+    });
+
+    for (let index = 0; index < arrayMessageTwDetail.length; index++) {
+        const element = arrayMessageTwDetail[index];
+        const newElementMessage = returnMessageChatSpecial(element);
+        newElementMessage.addEventListener('click', (e) => {
+
+            document.getElementById(config_web.id_html_area_comment_textarea).value = element.message;
+        });
+        replyCommentTwAreaRightBoxChat.appendChild(newElementMessage);
+    }
+
+    replyCommentTwAreaRight.appendChild(replyCommentTwAreaRightHead);
+    replyCommentTwAreaRight.appendChild(replyCommentTwAreaRightBoxChat);
+
+    return replyCommentTwAreaRight;
+}
+// UI DASHBOARD
+var dashBoardUi = async () => {
     var dashboardArea = document.createElement('div');
     dashboardArea.id = config_web.id_html_area_dashboard;
 
@@ -475,6 +708,12 @@ var dashBoardUi = () => {
             });
 
             aiAraeLeftTextarea.value = '';
+            // reset popup reply
+            if (document.getElementById(config_web.id_html_area_comment_detail)) {
+                document.getElementById(config_web.id_html_area_comment_right).removeChild(
+                    document.getElementById(config_web.id_html_area_comment_detail)
+                );
+            }
         }
     });
 
@@ -518,7 +757,7 @@ var dashBoardUi = () => {
     });
     // AI BOT AREA ******************************************
     var boxAiArea = document.createElement('div');
-    boxAiArea.id = config_web.id_html_area_tab_ai;
+    boxAiArea.id = config_web.id_html_area_ai;
 
     var aiArea = document.createElement('div');
     setStyleAtrribute(aiArea, {
@@ -623,7 +862,7 @@ var dashBoardUi = () => {
                 service_id: 1
             }
 
-            callApi('POST', '/ai-bot/comment-suggest', JSON.stringify(body), (res) => {
+            callApi(config_web.method_post, '/ai-bot/comment-suggest', JSON.stringify(body), (res) => {
                 const result = JSON.parse(res.responseText);
                 if (result.error_code == 0) {
                     const obj_answer = {
@@ -652,7 +891,7 @@ var dashBoardUi = () => {
     // END AI BOT AREA ******************************************
     // START TAB TW ******************************************
     var boxCommentTwArea = document.createElement('div');
-    boxCommentTwArea.id = config_web.id_html_area_tab_comment;
+    boxCommentTwArea.id = config_web.id_html_area_comment;
     setStyleAtrribute(boxCommentTwArea, { display: 'none' });
     var commentTwArea = document.createElement('div');
 
@@ -663,98 +902,12 @@ var dashBoardUi = () => {
     });
     //  AI BOT AREA  RIGHT 
     var commentTwAreaRight = document.createElement('div');
-    commentTwAreaRight.id = 'ai-area-right';
+    commentTwAreaRight.id = config_web.id_html_area_comment_right;
     setStyleAtrribute(commentTwAreaRight, {
         width: '50%',
         position: 'relative'
     });
 
-    // POPUP REPLY
-
-    var replyCommentTwAreaRight = document.createElement('div');
-    setStyleAtrribute(replyCommentTwAreaRight, {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-        background_color: 'white',
-        display: 'none',
-        overflow: 'hidden'
-    });
-
-    var replyCommentTwAreaRightHead = document.createElement('h3');
-    setStyleAtrribute(replyCommentTwAreaRightHead, {
-        position: 'relative'
-    });
-
-    var headBack = document.createElement('span');
-    setStyleAtrribute(headBack, {
-        position: 'absolute',
-        left: '10px',
-        font_size: '20px',
-        cursor: 'pointer',
-        color: 'white',
-        width: '30px',
-        height: '20px'
-    });
-    var iArrow = document.createElement('i');
-    setStyleAtrribute(iArrow, {
-        border: 'solid #4392A8',
-        border_width: '0 3px 3px 0',
-        display: 'inline-block',
-        padding: '3px',
-        transform: 'rotate(135deg)'
-    });
-    headBack.appendChild(iArrow);
-
-    headBack.addEventListener('click', () => {
-        setStyleAtrribute(replyCommentTwAreaRight, {
-            display: 'none'
-        });
-    })
-
-    replyCommentTwAreaRightHead.append(headBack);
-    var headBackTitle = document.createElement('span');
-    headBackTitle.innerText = 'ツイート'
-    setStyleAtrribute(headBackTitle, {
-        width: '100%',
-        padding: '0',
-        text_align: 'center',
-        font_size: '12px',
-        margin: '0 0 10px 0',
-        display: 'block'
-    });
-
-    replyCommentTwAreaRightHead.append(headBackTitle);
-    replyCommentTwAreaRight.appendChild(replyCommentTwAreaRightHead);
-
-    var replyCommentTwAreaRightBoxChat = document.createElement('div');
-    setStyleAtrribute(replyCommentTwAreaRightBoxChat, {
-        width: '100%',
-        padding: '10px',
-        max_height: '400px',
-        overflow: 'auto'
-    });
-
-    const arrayMessageTwDetail = [
-        {
-            is_question: false,
-            date: '2022.02.10 11:04',
-            avatar: config_web.avatar_bot,
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
-        }
-    ]
-
-    for (let index = 0; index < arrayMessageTwDetail.length; index++) {
-        const element = arrayMessageTwDetail[index];
-        const newElementMessage = returnMessageChatSpecial(element);
-        replyCommentTwAreaRightBoxChat.appendChild(newElementMessage);
-    }
-
-    replyCommentTwAreaRight.appendChild(replyCommentTwAreaRightHead);
-    replyCommentTwAreaRight.appendChild(replyCommentTwAreaRightBoxChat);
-    commentTwAreaRight.appendChild(replyCommentTwAreaRight);
 
     // COMMENT LIST
     var commentTwAreaRightHead = document.createElement('h3');
@@ -769,6 +922,7 @@ var dashBoardUi = () => {
     commentTwAreaRight.appendChild(commentTwAreaRightHead);
 
     var commentTwAreaRightBoxChat = document.createElement('div');
+    commentTwAreaRightBoxChat.id = 'comment-tw-area-right-boxChat';
     setStyleAtrribute(commentTwAreaRightBoxChat, {
         width: '100%',
         padding: '10px',
@@ -776,46 +930,36 @@ var dashBoardUi = () => {
         overflow: 'auto'
     });
 
-    const arrayMessageTw = [
-        {
-            is_question: false,
-            date: '2022.02.10 11:04',
-            avatar: config_web.avatar_bot,
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
-        },
-        {
-            is_question: true,
-            date: '2022.02.10 11:04',
-            avatar: config_web.avatar_bot,
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
-        },
-        {
-            is_question: false,
-            date: '2022.02.10 11:04',
-            avatar: config_web.avatar_bot,
-            message: 'DAIKO に質問をしてみてください。AIがお答えします。※ボックス右上のタグで「AI チャットボット」と「Twitter チャットボット」を切り替えることが出来ます。'
+    console.log('run');
+
+    await callApiAwait(config_web.method_get, '/tweet/page', null).then(res => {
+        console.log('get total page');
+        total_page = 5;
+    });
+    await callApiAwait(config_web.method_get, '/tweet/page', null).then(res => {
+        console.log(res, 'after render');
+        renderElementComment(commentTwAreaRightBoxChat, commentTwAreaRight, []);
+    });
+
+    console.log('after run');
+
+    commentTwAreaRightBoxChat.addEventListener('scroll', (e) => {
+        if (e.target.clientHeight + e.target.scrollTop == e.target.scrollHeight && current_page <= total_page) {
+            console.log('curent page', current_page);
+            showLoading();
+            callApi(config_web.method_get, '/ai-bot/tweet?page=' + current_page, null, (calback) => {
+                renderElementComment(commentTwAreaRightBoxChat, commentTwAreaRight, []);
+                current_page += 1;
+                hideLoading();
+            });
         }
-    ];
-
-
-    for (let index = 0; index < arrayMessageTw.length; index++) {
-        const element = arrayMessageTw[index];
-        const newElementMessageNormal = returnMessageChatSpecial(element);
-
-        newElementMessageNormal.addEventListener('click', () => {
-            setStyleAtrribute(replyCommentTwAreaRight, {
-                display: 'block'
-            })
-        });
-
-        commentTwAreaRightBoxChat.appendChild(newElementMessageNormal);
-    }
+    });
 
     commentTwAreaRight.appendChild(commentTwAreaRightBoxChat);
 
     //  AI BOT AREA  LEFT 
     var commentTwAreaLeft = document.createElement('div');
-    commentTwAreaLeft.id = 'comment-tw-area-left';
+    commentTwAreaLeft.id = config_web.id_html_area_comment_left;
     setStyleAtrribute(commentTwAreaLeft, {
         width: '50%',
         padding: '10px'
@@ -829,7 +973,7 @@ var dashBoardUi = () => {
     });
 
     var commentTwAreaLeftTextarea = document.createElement('textarea');
-    commentTwAreaLeftTextarea.id = 'comment-tw-area-left-textarea';
+    commentTwAreaLeftTextarea.id = config_web.id_html_area_comment_textarea;
     commentTwAreaLeftTextarea.placeholder = `ここに、質問を入力してください。`;
     setStyleAtrribute(commentTwAreaLeftTextarea, {
         font_size: '10px',
@@ -857,11 +1001,11 @@ var dashBoardUi = () => {
     });
     commentTwAreaLeftButton.addEventListener('click', () => {
         console.log(1)
-        if (replyCommentTwAreaRight.style.display == 'block') {
+        if (document.getElementById(config_web.id_html_area_comment_detail)) {
             const txt = commentTwAreaLeftTextarea.value;
             if (txt.trim().length > 0) {
                 const avatar_url = localStorage.getItem(config_web.tokenTwInfo) ?
-                    JSON.parse(localStor1age.getItem(config_web.tokenTwInfo)).photoURL : config_web.avatar_bot;
+                    JSON.parse(localStorage.getItem(config_web.tokenTwInfo)).photoURL : config_web.avatar_bot;
                 const obj = {
                     is_question: true,
                     date: convertDate(new Date().getTime()),
@@ -869,9 +1013,30 @@ var dashBoardUi = () => {
                     message: txt
                 };
                 // APPENT TO CHAT
-                replyCommentTwAreaRightBoxChat.appendChild(returnMessageChatNormal(obj));
-                replyCommentTwAreaRightBoxChat.scrollTop = replyCommentTwAreaRightBoxChat.scrollHeight - replyCommentTwAreaRightBoxChat.clientHeight;
+                document.getElementById(config_web.id_html_area_comment_detail_box_chat).appendChild(returnMessageChatNormal(obj));
+                document.getElementById(config_web.id_html_area_comment_detail_box_chat).scrollTop = document.getElementById(config_web.id_html_area_comment_detail_box_chat).scrollHeight - document.getElementById(config_web.id_html_area_comment_detail_box_chat).clientHeight;
                 commentTwAreaLeftTextarea.value = '';
+
+                const body = {
+                    session_id: -1,
+                    message: txt,
+                    service_id: 1
+                }
+
+                callApi(config_web.method_post, '/ai-bot/comment-suggest', JSON.stringify(body), (res) => {
+                    const result = JSON.parse(res.responseText);
+                    if (result.error_code == 0) {
+                        const obj_answer = {
+                            is_question: false,
+                            date: convertDate(new Date().getTime()),
+                            avatar: config_web.avatar_bot,
+                            message: result.result
+                        };
+                        document.getElementById(config_web.id_html_area_comment_detail_box_chat).appendChild(returnMessageChatNormal(obj_answer));
+                        document.getElementById(config_web.id_html_area_comment_detail_box_chat).scrollTop =
+                         document.getElementById(config_web.id_html_area_comment_detail_box_chat).scrollHeight - document.getElementById(config_web.id_html_area_comment_detail_box_chat).clientHeight;
+                    }
+                });
             }
         }
 
@@ -995,7 +1160,6 @@ var logoutTw = () => {
         localStorage.removeItem(config_web.tokenTw);
         localStorage.removeItem(config_web.tokenTwInfo);
         onloadEmbed();
-        console.log(1);
     }).catch((error) => {
         localStorage.removeItem(config_web.tokenTw);
         localStorage.removeItem(config_web.tokenTwInfo);
@@ -1003,8 +1167,8 @@ var logoutTw = () => {
         console.log(2);
     });
 }
-//END UI LOGIN AND HANDLE 
-function onloadEmbed() {
+//END UI LOGIN AND HANDLE  
+async function onloadEmbed() {
     const TOKEN = localStorage.getItem(config_web.tokenTw);
     const USER_INFO = localStorage.getItem(config_web.tokenTw);
 
@@ -1014,8 +1178,10 @@ function onloadEmbed() {
             if (document.getElementById(config_web.id_html_area_login)) {
                 EMBED_AREA.removeChild(document.getElementById(config_web.id_html_area_login));
             }
-            console.log(1);
-            EMBED_AREA.appendChild(dashBoardUi());
+            await dashBoardUi().then(res => {
+                EMBED_AREA.appendChild(res);
+            });
+            // console.log(abc);
         } else {
             if (document.getElementById(config_web.id_html_area_dashboard)) {
                 EMBED_AREA.removeChild(document.getElementById(config_web.id_html_area_dashboard));
@@ -1026,7 +1192,6 @@ function onloadEmbed() {
 }
 
 onloadEmbed();
-
 
 
 
